@@ -114,8 +114,8 @@
             background: #1d4ed8;
         }
 
-        .btn-danger { background: #ef4444; color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-        .btn-warning { background: #f59e0b; color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+        .btn-danger { background: #ef4444; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.75rem; font-weight: bold; }
+        .btn-warning { background: #f59e0b; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.75rem; font-weight: bold; }
         .btn-success { background: #22c55e; color: white; border: none; border-radius: 6px; padding: 10px; cursor: pointer; font-weight: bold; width: 100%; }
 
         .dashboard {
@@ -302,22 +302,22 @@
                         
                         <div class="form-group">
                             <label>1 SSH (IP:PORT@USER:PASS)</label>
-                            <input type="text" id="cfg-ssh-connect" value="ssh.sage.tun:443@user:pass">
+                            <input type="text" id="cfg-ssh-connect" placeholder="ssh.sage.tun:443@user:pass">
                         </div>
 
                         <div class="form-group">
                             <label>2 PAYLOAD</label>
-                            <textarea id="cfg-ssh-payload" rows="2">GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]</textarea>
+                            <textarea id="cfg-ssh-payload" rows="2" placeholder="GET / HTTP/1.1..."></textarea>
                         </div>
 
                         <div class="form-group">
                             <label>3 PROXY (IP:PORT)</label>
-                            <input type="text" id="cfg-ssh-proxy" value="104.16.0.1:80">
+                            <input type="text" id="cfg-ssh-proxy" placeholder="104.16.0.1:80">
                         </div>
 
                         <div class="form-group">
                             <label>4 SERVER NAME INDICATION (SNI)</label>
-                            <input type="text" id="cfg-ssh-sni" value="cdn.cloudflare.com">
+                            <input type="text" id="cfg-ssh-sni" placeholder="cdn.cloudflare.com">
                         </div>
 
                         <p style="color: #f59e0b; font-weight: bold; margin: 15px 0 10px 0; font-size: 0.85rem;">PARAMÈTRES</p>
@@ -363,15 +363,7 @@
                         </div>
                         <div class="form-group">
                             <label>Configuration JSON V2Ray</label>
-                            <textarea id="cfg-v2ray-json" rows="12">{
-  "inbounds": [{
-    "port": 443,
-    "protocol": "vless",
-    "settings": {
-      "clients": [{ "id": "b831381d-6324-4d53-ad4f-8cda98b3f811" }]
-    }
-  }]
-}</textarea>
+                            <textarea id="cfg-v2ray-json" rows="12"></textarea>
                         </div>
                         <button onclick="saveConfig('v2ray')" class="btn-success">💾 Sauvegarder V2Ray JSON</button>
                     </div>
@@ -440,9 +432,9 @@
             <!-- 6: GERER MES JETONS -->
             <div id="tab-manage-tokens" class="tab-content">
                 <div id="reseller-info-header" style="color:#f59e0b; font-weight:bold; margin-bottom:10px;"></div>
-                <h3 style="color:#38bdf8; margin-bottom:15px;">🎟👁 6_ Voir Mes Jetons</h3>
+                <h3 style="color:#38bdf8; margin-bottom:15px;">🎟👁 6_ Voir & Gérer Mes Jetons (Pause / Supprimer)</h3>
                 <table>
-                    <thead><tr><th>Jeton</th><th>Type</th><th>Expiration</th><th>Statut</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Jeton</th><th>Type</th><th>Statut</th><th>Actions</th></tr></thead>
                     <tbody id="tokens-table"></tbody>
                 </table>
             </div>
@@ -460,7 +452,7 @@
     </div>
 
     <script>
-        const DB_KEY = "SAGE_TUN_DATABASE";
+        const DB_KEY = "SAGE_TUN_DATABASE_V3";
         const SESSION_KEY = "SAGE_TUN_ADMIN_SESSION";
         const ADMIN_HWID = "HWID-Q580UM-MV1JYHT3";
 
@@ -468,8 +460,24 @@
             let data = localStorage.getItem(DB_KEY);
             if(!data) {
                 const init = {
+                    servers: {
+                        ssh: {
+                            connect: "ssh.sage.tun:443@user:pass",
+                            payload: "GET / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: websocket[crlf][crlf]",
+                            proxy: "104.16.0.1:80",
+                            sni: "cdn.cloudflare.com",
+                            dns: "8.8.8.8:8.0.0.1",
+                            udpgw: "127.0.0.1:7300",
+                            ping: true,
+                            tls: "TLSv1.3"
+                        },
+                        v2ray: {
+                            type: "VLESS",
+                            json: '{\n  "inbounds": [{\n    "port": 443,\n    "protocol": "vless",\n    "settings": {\n      "clients": [{ "id": "b831381d-6324-4d53-ad4f-8cda98b3f811" }]\n    }\n  }]\n}'
+                        }
+                    },
                     resellers: [{ id: "SAGE-3E474V-5675", limit: 20, used: 0, days: 30, active: true }],
-                    tokens: [{ code: "SAGE-653283-CREDIT", type: "VIP 31J", creator: "admin", expires: "2026-11-09", active: true }]
+                    tokens: [{ code: "SAGE-653283-CREDIT", type: "VIP 31J", creator: "admin", active: true }]
                 };
                 localStorage.setItem(DB_KEY, JSON.stringify(init));
                 return init;
@@ -555,6 +563,8 @@
                 `;
                 switchTab('tab-create-token', tabs.children[0]);
             }
+
+            loadServerInputs();
             renderTables();
         }
 
@@ -565,6 +575,48 @@
             btn.classList.add('active');
         }
 
+        // --- GESTION DES SERVEURS PERSISTANTS ---
+        function loadServerInputs() {
+            const db = getDB();
+            const s = db.servers.ssh;
+            document.getElementById("cfg-ssh-connect").value = s.connect;
+            document.getElementById("cfg-ssh-payload").value = s.payload;
+            document.getElementById("cfg-ssh-proxy").value = s.proxy;
+            document.getElementById("cfg-ssh-sni").value = s.sni;
+            document.getElementById("cfg-ssh-dns").value = s.dns;
+            document.getElementById("cfg-ssh-udpgw").value = s.udpgw;
+            document.getElementById("cfg-ssh-ping").checked = s.ping;
+            document.getElementById("cfg-ssh-tls").value = s.tls;
+
+            const v = db.servers.v2ray;
+            document.getElementById("cfg-v2ray-type").value = v.type;
+            document.getElementById("cfg-v2ray-json").value = v.json;
+        }
+
+        function saveConfig(type) {
+            const db = getDB();
+            if(type === 'ssh') {
+                db.servers.ssh = {
+                    connect: document.getElementById("cfg-ssh-connect").value,
+                    payload: document.getElementById("cfg-ssh-payload").value,
+                    proxy: document.getElementById("cfg-ssh-proxy").value,
+                    sni: document.getElementById("cfg-ssh-sni").value,
+                    dns: document.getElementById("cfg-ssh-dns").value,
+                    udpgw: document.getElementById("cfg-ssh-udpgw").value,
+                    ping: document.getElementById("cfg-ssh-ping").checked,
+                    tls: document.getElementById("cfg-ssh-tls").value
+                };
+            } else {
+                db.servers.v2ray = {
+                    type: document.getElementById("cfg-v2ray-type").value,
+                    json: document.getElementById("cfg-v2ray-json").value
+                };
+            }
+            saveDB(db);
+            alert("✅ Configuration " + type.toUpperCase() + " sauvegardée et enregistrée en permanence !");
+        }
+
+        // --- GENERATION & GESTION DES JETONS ---
         function generateToken(isPublic) {
             const db = getDB();
             if(currentUser.role === "reseller") {
@@ -581,7 +633,6 @@
                 code: code,
                 type: isPublic ? "Public (24h)" : "VIP",
                 creator: currentUser.id,
-                expires: "Actif",
                 active: true
             });
 
@@ -633,13 +684,17 @@
             if(tokTbody) {
                 tokTbody.innerHTML = "";
                 const list = currentUser.role === "admin" ? db.tokens : db.tokens.filter(t => t.creator === currentUser.id);
-                list.forEach(t => {
+                
+                list.forEach((t) => {
+                    const globalIdx = db.tokens.findIndex(tok => tok.code === t.code);
                     tokTbody.innerHTML += `<tr>
                         <td><code>${t.code}</code></td>
                         <td>${t.type}</td>
-                        <td>${t.expires}</td>
-                        <td><span class="badge ${t.active ? 'badge-online':'badge-offline'}">${t.active ? 'Valide':'Bloqué'}</span></td>
-                        <td><button class="btn-danger" onclick="toggleToken('${t.code}')">Couper</button></td>
+                        <td><span class="badge ${t.active ? 'badge-online':'badge-offline'}">${t.active ? 'Actif (En ligne)' : 'En Pause (Bloqué)'}</span></td>
+                        <td>
+                            <button class="btn-warning" onclick="toggleToken(${globalIdx})">${t.active ? 'Mettre Pause' : 'Activer'}</button>
+                            <button class="btn-danger" onclick="deleteToken(${globalIdx})" style="margin-left: 5px;">Supprimer</button>
+                        </td>
                     </tr>`;
                 });
             }
@@ -652,18 +707,20 @@
             renderTables();
         }
 
-        function toggleToken(code) {
+        function toggleToken(idx) {
             const db = getDB();
-            const t = db.tokens.find(tok => tok.code === code);
-            if(t) {
-                t.active = !t.active;
+            db.tokens[idx].active = !db.tokens[idx].active;
+            saveDB(db);
+            renderTables();
+        }
+
+        function deleteToken(idx) {
+            if(confirm("Voulez-vous vraiment supprimer ce jeton ?")) {
+                const db = getDB();
+                db.tokens.splice(idx, 1);
                 saveDB(db);
                 renderTables();
             }
-        }
-
-        function saveConfig(type) {
-            alert("✅ Configuration " + type.toUpperCase() + " enregistrée directement pour l'application SAGE TUN !");
         }
 
         function copyText(id) {
